@@ -1,341 +1,296 @@
-import React, { useState } from 'react';
-import { 
-  Upload, 
-  FileText, 
-  CheckCircle, 
-  AlertCircle, 
-  ArrowRight, 
-  Sparkles, 
-  Layers, 
-  RefreshCw,
-  Search,
-  Database
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendor-QuickBooks 스마트 매칭 시스템</title>
+    <!-- Tailwind CSS (스타일링) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- React 및 Babel (런타임 실행) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons (아이콘 라이브러리) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
 
-// 샘플 데이터 구성
-const INITIAL_VENDOR_BILLS = [
-  { id: 'VB-001', vendor: 'Sysco Food Services', file: 'sysco_invoice_9921.pdf', status: 'pending', date: '2026-07-15' },
-  { id: 'VB-002', vendor: 'US Foods', file: 'usfoods_receipt_774.png', status: 'completed', date: '2026-07-16' },
-];
+    <div id="root"></div>
 
-const INITIAL_QB_ITEMS = [
-  { itemCode: 'QB-APP-01', description: 'Organic Fuji Apples (Bulk)', sku: 'QB-FUJI-LG', mappedVendorSku: 'SYS-APP-99' },
-  { itemCode: 'QB-MILK-02', description: 'Whole Milk 1 Gal', sku: 'QB-WMILK-01', mappedVendorSku: '' },
-  { itemCode: 'QB-CHICK-03', description: 'Boneless Chicken Breast', sku: 'QB-CHICK-BNLS', mappedVendorSku: 'USF-CHICK-X' },
-];
+    <script type="text/babel">
+        // Lucide 아이콘 추출
+        const { Upload, FileText, CheckCircle, AlertCircle, ArrowRight, Sparkles, Layers, RefreshCw, Search, Database } = lucide;
 
-const EXTRACTED_BILL_ITEMS = [
-  { id: 'EXT-01', vendorSku: 'SYS-APP-99', name: 'Fuji Apple Large Count', qty: 5, price: 45.00 },
-  { id: 'EXT-02', vendorSku: 'SYS-MILK-X', name: 'Whole Milk Premium 1G', qty: 10, price: 3.80 }, // 미학습 상태 가정
-];
+        // 샘플 데이터
+        const INITIAL_VENDOR_BILLS = [
+            { id: 'VB-001', vendor: 'Sysco Food Services', file: 'sysco_invoice_9921.pdf', status: 'pending', date: '2026-07-15' },
+            { id: 'VB-002', vendor: 'US Foods', file: 'usfoods_receipt_774.png', status: 'completed', date: '2026-07-16' },
+        ];
 
-export default function ReconcilerDashboard() {
-  const [vendorBills, setVendorBills] = useState(INITIAL_VENDOR_BILLS);
-  const [qbItems, setQbItems] = useState(INITIAL_QB_ITEMS);
-  const [extractedItems, setExtractedItems] = useState(EXTRACTED_BILL_ITEMS);
-  
-  // 학습 모달 및 매핑 상태 관리
-  const [learningItem, setLearningItem] = useState<any>(null);
-  const [selectedQbCode, setSelectedQbCode] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+        const INITIAL_QB_ITEMS = [
+            { itemCode: 'QB-APP-01', description: 'Organic Fuji Apples (Bulk)', sku: 'QB-FUJI-LG', mappedVendorSku: 'SYS-APP-99' },
+            { itemCode: 'QB-MILK-02', description: 'Whole Milk 1 Gal', sku: 'QB-WMILK-01', mappedVendorSku: '' },
+            { itemCode: 'QB-CHICK-03', description: 'Boneless Chicken Breast', sku: 'QB-CHICK-BNLS', mappedVendorSku: 'USF-CHICK-X' },
+        ];
 
-  // 벤더 빌 업로드 시뮬레이션
-  const handleVendorUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const fileName = e.target.files[0].name;
-      const newBill = {
-        id: `VB-${Date.now().toString().slice(-3)}`,
-        vendor: 'New Detected Vendor',
-        file: fileName,
-        status: 'pending',
-        date: new Date().toISOString().split('T')[0]
-      };
-      setVendorBills([newBill, ...vendorBills]);
-    }
-  };
+        const EXTRACTED_BILL_ITEMS = [
+            { id: 'EXT-01', vendorSku: 'SYS-APP-99', name: 'Fuji Apple Large Count', qty: 5, price: 45.00 },
+            { id: 'EXT-02', vendorSku: 'SYS-MILK-X', name: 'Whole Milk Premium 1G', qty: 10, price: 3.80 },
+        ];
 
-  // 퀵북 엑셀 업로드 시뮬레이션
-  const handleQbExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      alert(`엑셀 파일(${e.target.files[0].name})로부터 아이템 코드, 설명, SKU를 성공적으로 가져왔습니다.`);
-      // 실제 구현시 여기서 XLSX 파싱 수행
-    }
-  };
-
-  // 학습(매핑) 저장 함수
-  const handleSaveMapping = () => {
-    if (!learningItem || !selectedQbCode) return;
-
-    // 1. 퀵북 아이템 리스트에 벤더 SKU 매핑 정보 업데이트
-    setQbItems(prev => prev.map(item => {
-      if (item.itemCode === selectedQbCode) {
-        return { ...item, mappedVendorSku: learningItem.vendorSku };
-      }
-      return item;
-    }));
-
-    // 2. 대시보드 상태 업데이트 (학습 완료 표시용)
-    alert(`💡 학습 완료!\n벤더 SKU [${learningItem.vendorSku}]가 퀵북 아이템 [${selectedQbCode}]에 성공적으로 매핑되었습니다. 앞으로 자동으로 계산됩니다.`);
-    
-    setLearningItem(null);
-    setSelectedQbCode('');
-  };
-
-  // 검색어로 퀵북 아이템 필터링
-  const filteredQbItems = qbItems.filter(item => 
-    item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-800">
-      {/* 상단 헤더 */}
-      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <Layers className="text-indigo-600" /> Vendor-QuickBooks 스마트 매칭 시스템
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            벤더 영수증의 SKU와 퀵북의 SKU가 달라도 학습을 통해 자동으로 매칭하고 계산합니다.
-          </p>
-        </div>
-      </div>
-
-      {/* 메인 그리드 영역 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* 1. 데이터 소스 업로드 섹션 */}
-        <div className="lg:col-span-1 space-y-6">
-          
-          {/* 벤더 빌 업로드 (사진/PDF) */}
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-base font-semibold mb-3 flex items-center gap-2 text-slate-700">
-              <FileText className="w-4 h-4 text-indigo-500" /> 1. 벤더 빌 업로드 (PDF / 이미지)
-            </h2>
-            <label className="border-2 border-dashed border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors">
-              <Upload className="w-8 h-8 text-slate-400 mb-2" />
-              <span className="text-xs font-medium text-slate-600">파일 선택 또는 드래그</span>
-              <span className="text-[11px] text-slate-400 mt-1">PDF, PNG, JPG 지원</span>
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleVendorUpload} />
-            </label>
-
-            {/* 업로드된 빌 목록 */}
-            <div className="mt-4 space-y-2">
-              {vendorBills.map(bill => (
-                <div key={bill.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-xs">
-                  <div className="flex items-center gap-2 truncate">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                    <span className="font-medium text-slate-700 truncate">{bill.file}</span>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                    bill.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  }`}>
-                    {bill.status === 'completed' ? '분석 완료' : '매핑 대기'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 퀵북 아이템 업로드 (Excel) */}
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-base font-semibold mb-3 flex items-center gap-2 text-slate-700">
-              <Database className="w-4 h-4 text-emerald-500" /> 2. 퀵북 마스터 아이템 (Excel)
-            </h2>
-            <label className="border-2 border-dashed border-emerald-100 bg-emerald-50/30 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50 transition-colors">
-              <Upload className="w-6 h-6 text-emerald-500 mb-1" />
-              <span className="text-xs font-medium text-emerald-700">QuickBooks 아이템 엑셀 등록</span>
-              <span className="text-[10px] text-emerald-500/70 mt-0.5">필수: 아이템 코드, 설명, SKU</span>
-              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQbExcelUpload} />
-            </label>
+        function ReconcilerDashboard() {
+            const [vendorBills, setVendorBills] = React.useState(INITIAL_VENDOR_BILLS);
+            const [qbItems, setQbItems] = React.useState(INITIAL_QB_ITEMS);
+            const [extractedItems, setExtractedItems] = React.useState(EXTRACTED_BILL_ITEMS);
             
-            <div className="mt-3 text-[11px] text-slate-400 text-center">
-              현재 마스터 데이터 내 <strong>{qbItems.length}개</strong>의 아이템 로드됨
-            </div>
-          </div>
+            const [learningItem, setLearningItem] = React.useState(null);
+            const [selectedQbCode, setSelectedQbCode] = React.useState('');
+            const [searchTerm, setSearchTerm] = React.useState('');
 
-        </div>
+            // 벤더 파일 업로드 핸들러
+            const handleVendorUpload = (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    const fileName = e.target.files[0].name;
+                    const newBill = {
+                        id: `VB-${Date.now().toString().slice(-3)}`,
+                        vendor: '신규 업로드 벤더',
+                        file: fileName,
+                        status: 'pending',
+                        date: new Date().toISOString().split('T')[0]
+                    };
+                    setVendorBills([newBill, ...vendorBills]);
+                }
+            };
 
-        {/* 2. 교차 매칭 및 매핑 계산 현황 */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <div>
-                <h2 className="font-semibold text-slate-800 text-base">추출 내역 및 실시간 SKU 매칭 현황</h2>
-                <p className="text-xs text-slate-400 mt-0.5">최근 업로드된 빌에서 추출된 품목 리스트입니다.</p>
-              </div>
-              <span className="text-xs bg-indigo-50 text-indigo-700 font-medium px-2 py-1 rounded-md flex items-center gap-1">
-                <RefreshCw className="w-3 h-3 animate-spin-slow" /> 실시간 계산 엔진 작동중
-              </span>
-            </div>
+            // 퀵북 엑셀 업로드 핸들러
+            const handleQbExcelUpload = (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    alert(`엑셀 파일(${e.target.files[0].name})로부터 아이템 코드, 설명, SKU 구조를 성공적으로 로드했습니다.`);
+                }
+            };
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-100/70 text-slate-500 uppercase font-semibold border-b border-slate-200">
-                    <th className="p-3">벤더 SKU</th>
-                    <th className="p-3">추출된 품목명</th>
-                    <th className="p-3">수량/금액</th>
-                    <th className="p-3 text-center">연동 상태 (학습 여부)</th>
-                    <th className="p-3 text-right">매핑 액션</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {extractedItems.map((item) => {
-                    // 현재 벤더 SKU가 퀵북 데이터에 매핑되어 있는지 조회
-                    const matchedQbItem = qbItems.find(qb => qb.mappedVendorSku === item.vendorSku);
-                    
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="p-3 font-mono font-medium text-indigo-600">{item.vendorSku}</td>
-                        <td className="p-3">
-                          <div className="font-medium text-slate-700">{item.name}</div>
-                        </td>
-                        <td className="p-3 text-slate-500">
-                          {item.qty}개 / ${(item.qty * item.price).toLocaleString()}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex justify-center">
-                            {matchedQbItem ? (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-medium text-[11px]">
-                                <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                                학습됨 ({matchedQbItem.itemCode})
-                              </div>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-medium text-[11px]">
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                                매핑 필요 (미학습 SKU)
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3 text-right">
-                          {matchedQbItem ? (
-                            <div className="text-[11px] text-slate-400 pr-2">
-                              QB SKU: <code className="font-mono text-slate-600">{matchedQbItem.sku}</code>와 계산 매칭됨
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setLearningItem(item)}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors font-medium text-[11px] shadow-sm"
-                            >
-                              <Sparkles className="w-3 h-3" /> 매핑 학습시키기
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+            // 학습(매핑) 저장
+            const handleSaveMapping = () => {
+                if (!learningItem || !selectedQbCode) return;
 
-      {/* 3. AI 매핑 매칭 학습 모달 (팝업 레이어) */}
-      {learningItem && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-slate-100 bg-indigo-50/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="text-indigo-600 w-5 h-5" />
-                <h3 className="font-bold text-slate-900">미학습 SKU 매핑 규칙 지정</h3>
-              </div>
-              <button 
-                onClick={() => setLearningItem(null)}
-                className="text-slate-400 hover:text-slate-600 font-medium text-sm"
-              >
-                닫기
-              </button>
-            </div>
+                setQbItems(prev => prev.map(item => {
+                    if (item.itemCode === selectedQbCode) {
+                        return { ...item, mappedVendorSku: learningItem.vendorSku };
+                    }
+                    return item;
+                }));
 
-            <div className="p-5 space-y-4">
-              {/* 타겟 대상 정보 */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-slate-400 block">선택된 벤더 SKU</span>
-                  <span className="font-mono font-bold text-indigo-600">{learningItem.vendorSku}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">추출된 아이템 명칭</span>
-                  <span className="font-medium text-slate-700 truncate block">{learningItem.name}</span>
-                </div>
-              </div>
+                alert(`💡 학습 완료!\n벤더 SKU [${learningItem.vendorSku}]가 퀵북 아이템 [${selectedQbCode}]에 매핑되었습니다. 앞으로 자동 계산됩니다.`);
+                setLearningItem(null);
+                setSelectedQbCode('');
+            };
 
-              <div className="text-center text-slate-400 py-1">
-                <ArrowRight className="w-5 h-5 mx-auto rotate-90 transform text-slate-300" />
-              </div>
+            const filteredQbItems = qbItems.filter(item => 
+                item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+            );
 
-              {/* 연결할 퀵북 아이템 선택 매칭 */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-700 block">연결할 퀵북 아이템 지정 (엑셀 로드 데이터)</label>
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="아이템 코드, 설명, SKU로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                {/* 퀵북 아이템 선택 리스트박스 */}
-                <div className="border border-slate-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-slate-100">
-                  {filteredQbItems.map((qb) => (
-                    <label 
-                      key={qb.itemCode} 
-                      className={`flex items-start gap-3 p-2.5 text-xs cursor-pointer hover:bg-slate-50 transition-colors ${
-                        selectedQbCode === qb.itemCode ? 'bg-indigo-50/60 font-medium' : ''
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="qbItemSelect"
-                        value={qb.itemCode}
-                        checked={selectedQbCode === qb.itemCode}
-                        onChange={() => setSelectedQbCode(qb.itemCode)}
-                        className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between">
-                          <span className="text-slate-900 font-mono font-semibold">{qb.itemCode}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">SKU: {qb.sku}</span>
+            return (
+                <div className="min-h-screen p-6 max-w-7xl mx-auto">
+                    {/* 헤더 */}
+                    <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center border-b border-slate-200 pb-5">
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                                <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Layers class="w-6 h-6" /></span>
+                                Vendor-QuickBooks 스마트 매칭 시스템
+                            </h1>
+                            <p className="text-sm text-slate-500 mt-1">
+                                벤더 영수증의 SKU와 퀵북의 SKU가 달라도 학습을 통해 자동으로 매칭하고 정산 금액을 계산합니다.
+                            </p>
                         </div>
-                        <p className="text-slate-500 text-[11px] truncate mt-0.5">{qb.description}</p>
-                      </div>
-                    </label>
-                  ))}
-                  {filteredQbItems.length === 0 && (
-                    <div className="p-4 text-center text-slate-400 text-xs">일치하는 퀵북 아이템이 없습니다.</div>
-                  )}
-                </div>
-              </div>
-            </div>
+                    </div>
 
-            {/* 하단 제어 바 */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-              <button
-                onClick={() => setLearningItem(null)}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800"
-              >
-                취소
-              </button>
-              <button
-                disabled={!selectedQbCode}
-                onClick={handleSaveMapping}
-                className={`px-4 py-2 text-xs font-medium text-white rounded-lg shadow-sm transition-colors ${
-                  selectedQbCode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-300 cursor-not-allowed'
-                }`}
-              >
-                매핑 규칙 학습 저장
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                    {/* 메인 레이아웃 */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        {/* 왼쪽: 파일 업로드 영역 */}
+                        <div className="lg:col-span-1 space-y-6">
+                            {/* 벤더 빌 업로드 */}
+                            <div className="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
+                                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-700">
+                                    <FileText class="w-4 h-4 text-indigo-500" /> 1. 벤더 빌 업로드 (PDF / 사진)
+                                </h2>
+                                <label className="border-2 border-dashed border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <Upload class="w-8 h-8 text-slate-400 mb-2" />
+                                    <span className="text-xs font-medium text-slate-600">파일 선택 또는 드래그</span>
+                                    <span className="text-[11px] text-slate-400 mt-1">PDF, PNG, JPG 지원</span>
+                                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleVendorUpload} />
+                                </label>
+
+                                <div className="mt-4 space-y-2">
+                                    {vendorBills.map(bill => (
+                                        <div key={bill.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-xs">
+                                            <span className="font-medium text-slate-700 truncate max-w-[150px]">{bill.file}</span>
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                                bill.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                            }`}>
+                                                {bill.status === 'completed' ? '분석 완료' : '매핑 대기'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 퀵북 아이템 업로드 */}
+                            <div className="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
+                                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-700">
+                                    <Database class="w-4 h-4 text-emerald-500" /> 2. 퀵북 마스터 아이템 (Excel)
+                                </h2>
+                                <label className="border-2 border-dashed border-emerald-100 bg-emerald-50/30 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50 transition-colors">
+                                    <Upload class="w-6 h-6 text-emerald-500 mb-1" />
+                                    <span className="text-xs font-medium text-emerald-700">QuickBooks 엑셀 등록</span>
+                                    <span className="text-[10px] text-emerald-600/70 mt-0.5">필수: 코드, 설명, SKU 포함</span>
+                                    <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQbExcelUpload} />
+                                </label>
+                                <div className="mt-3 text-[11px] text-slate-400 text-center">
+                                    현재 매핑 풀에 <strong>{qbItems.length}개</strong>의 아이템 로드됨
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 오른쪽: 실시간 매칭 테이블 */}
+                        <div className="lg:col-span-2">
+                            <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                    <div>
+                                        <h2 className="font-semibold text-slate-800 text-base">추출 내역 및 실시간 SKU 매칭 현황</h2>
+                                        <p className="text-xs text-slate-400 mt-0.5">영수증 이미지/PDF에서 읽어온 원본 아이템 목록입니다.</p>
+                                    </div>
+                                    <span className="text-xs bg-indigo-50 text-indigo-700 font-medium px-2 py-1 rounded-md flex items-center gap-1 animate-pulse">
+                                        <RefreshCw class="w-3 h-3" /> 매칭 엔진 작동중
+                                    </span>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200 text-[11px]">
+                                                <th className="p-4">벤더 원본 SKU</th>
+                                                <th className="p-4">추출된 품목명</th>
+                                                <th className="p-4">수량/금액</th>
+                                                <th className="p-4 text-center">연동 상태 (학습 여부)</th>
+                                                <th className="p-4 text-right">매핑 액션</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {extractedItems.map((item) => {
+                                                const matchedQbItem = qbItems.find(qb => qb.mappedVendorSku === item.vendorSku);
+                                                return (
+                                                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="p-4 font-mono font-medium text-indigo-600">{item.vendorSku}</td>
+                                                        <td className="p-4 font-medium text-slate-700">{item.name}</td>
+                                                        <td className="p-4 text-slate-500">{item.qty}개 / ${(item.qty * item.price).toLocaleString()}</td>
+                                                        <td className="p-4 text-center">
+                                                            {matchedQbItem ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-medium">
+                                                                    <CheckCircle class="w-3 h-3 text-emerald-500" /> 학습됨 ({matchedQbItem.itemCode})
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[11px] font-medium">
+                                                                    <AlertCircle class="w-3 h-3 text-rose-500" /> 미학습 SKU
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-4 text-right">
+                                                            {matchedQbItem ? (
+                                                                <span className="text-[11px] text-slate-400 font-mono">QB SKU: {matchedQbItem.sku}</span>
+                                                            ) : (
+                                                                <button 
+                                                                    onClick={() => setLearningItem(item)}
+                                                                    className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-md text-[11px] font-medium hover:bg-indigo-700 shadow-xs flex items-center gap-1 ml-auto"
+                                                                >
+                                                                    <Sparkles class="w-3 h-3" /> 매핑 학습시키기
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 학습용 팝업 모달 */}
+                    {learningItem && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden">
+                                <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1">
+                                        <Sparkles class="w-4 h-4 text-indigo-600" /> 불일치 SKU 학습 매핑 규칙 설정
+                                    </h3>
+                                    <button onClick={() => setLearningItem(null)} className="text-slate-400 hover:text-slate-600 text-xs">닫기</button>
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    <div className="p-3 bg-slate-50 rounded-lg text-xs space-y-1 border border-slate-200">
+                                        <div><span className="text-slate-400">대상 벤더 SKU:</span> <span className="font-mono font-bold text-indigo-600">{learningItem.vendorSku}</span></div>
+                                        <div><span className="text-slate-400">추출 품목명:</span> <span className="font-medium text-slate-700">{learningItem.name}</span></div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-semibold text-slate-700 block">연결할 퀵북 마스터 아이템 지정 (엑셀 로드 데이터)</label>
+                                        <div className="relative">
+                                            <Search class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                                            <input 
+                                                type="text" 
+                                                placeholder="코드, 설명, SKU 검색..." 
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-indigo-500"
+                                            />
+                                        </div>
+                                        <div className="border border-slate-200 rounded-lg max-h-36 overflow-y-auto divide-y divide-slate-100">
+                                            {filteredQbItems.map(qb => (
+                                                <label key={qb.itemCode} className="flex items-start gap-2.5 p-2 text-xs cursor-pointer hover:bg-slate-50">
+                                                    <input 
+                                                        type="radio" 
+                                                        name="qbSelect" 
+                                                        checked={selectedQbCode === qb.itemCode} 
+                                                        onChange={() => setSelectedQbCode(qb.itemCode)}
+                                                        className="mt-0.5" 
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between font-mono font-semibold text-slate-800">
+                                                            <span>{qb.itemCode}</span>
+                                                            <span className="text-[10px] text-slate-400">SKU: {qb.sku}</span>
+                                                        </div>
+                                                        <p className="text-slate-500 text-[11px] truncate">{qb.description}</p>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">
+                                    <button onClick={() => setLearningItem(null)} className="px-3 py-1.5 text-slate-500">취소</button>
+                                    <button 
+                                        disabled={!selectedQbCode} 
+                                        onClick={handleSaveMapping}
+                                        className={`px-3 py-1.5 text-white rounded-md font-medium ${selectedQbCode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-300 cursor-not-allowed'}`}
+                                    >
+                                        학습 및 규칙 저장
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = tragedies = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ReconcilerDashboard />);
+    </script>
+</body>
+</html>
